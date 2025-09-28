@@ -1,0 +1,267 @@
+#!/bin/bash -l
+
+# Set SCC project
+#$ -P llamagrp
+
+# Specify hard time limit for the job.
+#   The job will be aborted if it runs longer than this time.
+#   The default time is 12 hours
+#$ -l h_rt=12:00:00
+
+# Send an email when the job finishes or if it is aborted (by default no email is sent).
+####$ -m ea
+
+# Give job a name
+#$ -N mt-8b-psgpt4
+
+# Combine output and error files into a single file
+#$ -j y
+#$ -o log
+
+# request 6 cores, each with 6 GB RAM at least
+#$ -pe omp 4
+###$ -l mem_per_core=6G
+
+# request 1 GPU
+#$ -l gpus=1
+#$ -l gpu_c=8.5
+##### GPU compatibility >=8.0 supports bf16
+#$ -l gpu_memory=48G
+
+# Submit an array job with 35 tasks
+#$ -t 1-35
+
+
+# Keep track of information related to the current job
+echo "=========================================================="
+echo "Start date : $(date)"
+echo "Job name : $JOB_NAME"
+echo "Job ID : $JOB_ID  $SGE_TASK_ID"
+echo "=========================================================="
+nvidia-smi
+
+# Transformer version == 4.34.0 (earliest for mistral), later ones cause issue with tyro lib in trl
+# ============= Adjust environment below for your needs =================
+module load cuda/12.2
+module load torch/2.1
+conda activate <your environment>
+ROOT=$(pwd)
+export PYTHONPATH=$PYTHONPATH:$ROOT/sampling
+export PYTHONPATH=$PYTHONPATH:$ROOT/alignment-handbook-mirror/src
+export HF_HOME="<your hf cache dir>"
+huggingface-cli login --token <your_hf_token>
+# =======================================================================
+
+index=$(($SGE_TASK_ID-1))
+export -n HF_TOKEN
+huggingface-cli login --token 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
+
+# meta-llama/Llama-3.2-3B-Instruct meta-llama/Llama-3.2-1B-Instruct
+# mistralai/Ministral-8B-Instruct-2410 HuggingFaceH4/zephyr-7b-beta
+MODEL="HuggingFaceH4/zephyr-7b-beta"
+#MODEL_SHORT="_ministral8b" #  _llama323b, _llama321b, _ministral8b
+if [ "$MODEL_SHORT" = "_ministral8b" ]; then
+  INSERT_SYSTEM_MSG=false
+else
+  INSERT_SYSTEM_MSG=true
+fi
+
+
+# loop based solution to setup parallel scripts
+declare -a params
+idx=0
+IFS=' ' # space is set as delimiter
+for PREFIX_FIELD in "persona_xy_4s_gpt4${MODEL_SHORT}" "no_prefix" "persona_xy_4s_gpt4" "persona_gold_gpt4" "tag" "name" "xyw_2s"
+do
+  for CV in 0 1 2 3 4
+  do
+    params[idx]=$PREFIX_FIELD$IFS$CV
+    ((idx++))
+  done
+done
+read -ra taskinput <<< "${params[$index]}" # str is read into an array as tokens separated by IFS
+PREFIX_FIELD=${taskinput[0]}
+CV=${taskinput[1]}
+
+RUNNAME="overton_${PREFIX_FIELD}_cv${CV}"
+
+GROUP_DIR="one_model_for_all_cv${MODEL_SHORT}"
+
+MAX_LEN=2500
+MAX_PROMPT_LEN=$(( $MAX_LEN - 512 ))
+
+MAIN_PORT=$(( RANDOM % (50000 - 30000 + 1 ) + 30000 ))
+
+if [[ "$PREFIX_FIELD" == "no_prefix" ]]; then
+  DATA_PREFIX_TAG=""
+else
+  DATA_PREFIX_TAG="_${PREFIX_FIELD}-name-prefixed"
+fi
+
+echo "Running prefix_field=${PREFIX_FIELD}, CV=${CV}, runname=${RUNNAME}, data_prefix=${DATA_PREFIX_TAG}"
+
+# for 50 people
+FIFTY_NAMES=("halleberry" "donaldtrump" "berniesanders" "jenniferaniston" "alexandriaocasio-cortez" "joebiden" "gwynethpaltrow" "meganfox" "randpaul" "ellendegeneres" "barackobama" "beyoncé" "billclinton" "billieeilish" "chazbono" "danielradcliffe" "davidbeckham" "elonmusk" "eltonjohn" "gordonramsey" "j.k.rowling" "jeffbezos" "joelosteen" "latanyasweeney" "lavernecox" "lebronjames" "mayimbialik" "merylstreep" "miketrout" "milliebobbybrown" "neildegrassetyson" "oprahwinfrey" "princeharry" "queenelizabethii" "quentintarantino" "richarddawkins" "richardgere" "robertdeniro" "samsmith" "sebastianthrun" "serenawilliams" "sherylsandberg" "sirianmckellen" "suchisaria" "taylorswift" "tigerwoods" "timnitgebru" "tombrady" "yoshuabengio" "zaynmalik")
+declare -A CV_TRAIN_NAME=(
+["0"]='lebronjames davidbeckham tigerwoods miketrout berniesanders gwynethpaltrow meganfox jenniferaniston halleberry donaldtrump randpaul alexandriaocasio-cortez joelosteen richarddawkins richardgere zaynmalik milliebobbybrown billieeilish barackobama merylstreep eltonjohn tombrady j.k.rowling robertdeniro oprahwinfrey beyoncé danielradcliffe lavernecox chazbono quentintarantino gordonramsey sherylsandberg billclinton taylorswift suchisaria yoshuabengio latanyasweeney sebastianthrun jeffbezos queenelizabethii'
+["1"]='lebronjames serenawilliams tigerwoods miketrout princeharry berniesanders ellendegeneres meganfox jenniferaniston halleberry elonmusk donaldtrump randpaul joebiden joelosteen richarddawkins mayimbialik richardgere milliebobbybrown billieeilish barackobama sirianmckellen merylstreep eltonjohn tombrady robertdeniro oprahwinfrey beyoncé samsmith chazbono neildegrassetyson quentintarantino gordonramsey sherylsandberg taylorswift timnitgebru suchisaria latanyasweeney sebastianthrun queenelizabethii'
+["2"]='lebronjames serenawilliams davidbeckham miketrout princeharry ellendegeneres gwynethpaltrow jenniferaniston halleberry elonmusk donaldtrump randpaul alexandriaocasio-cortez joebiden joelosteen richarddawkins mayimbialik zaynmalik milliebobbybrown billieeilish sirianmckellen eltonjohn tombrady j.k.rowling oprahwinfrey beyoncé danielradcliffe samsmith lavernecox neildegrassetyson quentintarantino gordonramsey billclinton taylorswift timnitgebru yoshuabengio latanyasweeney sebastianthrun jeffbezos queenelizabethii'
+["3"]='lebronjames serenawilliams davidbeckham tigerwoods princeharry berniesanders ellendegeneres gwynethpaltrow meganfox halleberry elonmusk donaldtrump alexandriaocasio-cortez joebiden joelosteen mayimbialik richardgere zaynmalik billieeilish barackobama sirianmckellen merylstreep eltonjohn j.k.rowling robertdeniro beyoncé danielradcliffe samsmith lavernecox chazbono neildegrassetyson quentintarantino sherylsandberg billclinton taylorswift timnitgebru suchisaria yoshuabengio sebastianthrun jeffbezos'
+["4"]='serenawilliams davidbeckham tigerwoods miketrout princeharry berniesanders ellendegeneres gwynethpaltrow meganfox jenniferaniston elonmusk randpaul alexandriaocasio-cortez joebiden richarddawkins mayimbialik richardgere zaynmalik milliebobbybrown barackobama sirianmckellen merylstreep tombrady j.k.rowling robertdeniro oprahwinfrey danielradcliffe samsmith lavernecox chazbono neildegrassetyson gordonramsey sherylsandberg billclinton timnitgebru suchisaria yoshuabengio latanyasweeney jeffbezos queenelizabethii'
+)
+declare -A CV_TEST_NAME=(
+["0"]='serenawilliams,princeharry,ellendegeneres,elonmusk,joebiden,mayimbialik,sirianmckellen,samsmith,neildegrassetyson,timnitgebru'
+["1"]='davidbeckham,gwynethpaltrow,alexandriaocasio-cortez,zaynmalik,j.k.rowling,danielradcliffe,lavernecox,billclinton,yoshuabengio,jeffbezos'
+["2"]='tigerwoods,berniesanders,meganfox,richardgere,barackobama,merylstreep,robertdeniro,chazbono,sherylsandberg,suchisaria'
+["3"]='miketrout,jenniferaniston,randpaul,richarddawkins,milliebobbybrown,tombrady,oprahwinfrey,gordonramsey,latanyasweeney,queenelizabethii'
+["4"]='lebronjames,halleberry,donaldtrump,joelosteen,billieeilish,eltonjohn,beyoncé,quentintarantino,taylorswift,sebastianthrun'
+)
+EXP_OUT_DIR="pp-50-final"
+DATA_DIR="${ROOT}/data/pp-50-final/50p_200d_total_50r_tem2.0_top0.8_cot_filtered20m4k_yl-random_cot_annotated_self-yl${DATA_PREFIX_TAG}"
+EPOCH=2
+#LR='2e-4' # llama31b
+#LR='1e-4' # llama33b
+LR='5e-5' # zephyr7b, ministral8b
+
+
+declare -a TRAIN_NAMES=(${CV_TRAIN_NAME[$CV]})
+TEST_NAMES=${CV_TEST_NAME[$CV]}
+cd alignment-handbook-mirror
+
+# meta train / eval
+export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
+echo "Starting meta train on cv${CV}..."
+ACCELERATE_LOG_LEVEL=info accelerate launch \
+  --config_file recipes/accelerate_configs/multi_gpu.yaml \
+  --num_processes=1 \
+  --main_process_port=$MAIN_PORT \
+  scripts/run_dpo.py \
+    recipes/mistral-7b-ours/dpo/config_qlora.yaml \
+    --report_to=wandb \
+    --model_name_or_path=$MODEL \
+    --report_to=wandb \
+    --hub_model_id=$RUNNAME \
+    --run_name=$RUNNAME \
+    --output_dir="../dump/${EXP_OUT_DIR}/${GROUP_DIR}/${RUNNAME}" \
+    --dataset_mixer='{"'$DATA_DIR'/cv'$CV'":1.0}' \
+    --dataset_splits="train_meta_prefs.json,test_meta_prefs.json" \
+    --auto_insert_empty_system_msg=$INSERT_SYSTEM_MSG \
+    --per_device_train_batch_size=1 \
+    --gradient_accumulation_steps=40 \
+    --max_length=$MAX_LEN \
+    --max_prompt_length=$MAX_PROMPT_LEN \
+    --eval_steps=10 \
+    --save_steps=10 \
+    --combine_eval_splits=true \
+    --metric_for_best_model="eval_rewards/accuracies" \
+    --num_train_epochs=$EPOCH \
+    --save_total_limit=2 \
+    --max_eval_data=200 \
+    --load_best_model_at_end=true \
+    --learning_rate="${LR}" \
+    --beta=0.01 \
+
+##    --per_device_eval_batch_size=10
+#    # only for ministral8b cv4 = 5
+
+
+cd $ROOT/reward-bench
+for NAME in "${FIFTY_NAMES[@]}"
+do
+    echo "Starting inferencing on individual personas ${NAME} (cv=${CV})..."
+    if [[ ${TRAIN_NAMES[@]} =~ $NAME ]]
+    then
+      echo "${NAME} in train names, in-domain!"
+            EVAL_DIR="${ROOT}/dump/${EXP_OUT_DIR}/${GROUP_DIR}/${RUNNAME}/eval/${NAME}"
+    else
+      echo "${NAME} not in train names, out-of-domain!"
+            EVAL_DIR="${ROOT}/dump/${EXP_OUT_DIR}/${GROUP_DIR}/${RUNNAME}/eval_OOD/${NAME}"
+    fi
+
+    MODEL_DIR="${ROOT}/dump/${EXP_OUT_DIR}/${GROUP_DIR}/${RUNNAME}"
+    mkdir -p "${EVAL_DIR}"
+
+    echo "========================================"
+    echo "Evaluating prefix ${PREFIX_FIELD} for ${NAME}"
+    echo "the prefix for ${NAME} is the following:"
+    echo "${PREFIX}"
+    echo "========================================"
+    NO_PREFIX_DATA_DIR="${ROOT}/data/pp-50-final/50p_200d_total_50r_tem2.0_top0.8_cot_filtered20m4k_yl-random_cot_annotated_self-yl"
+    MAX_LEN=2500
+#     eval using llm harness
+#    echo "${EVAL_DIR}/llm_harness_results"
+#    if [ ! -d "${EVAL_DIR}/llm_harness_results" ] ; then
+#      echo "Evaluating base model on LLM harness"
+#      lm_eval --model hf \
+#      --model_args "pretrained=${MODEL_DIR}" \
+#      --output_path "${EVAL_DIR}/llm_harness_results" \
+#      --system_instruction "${PREFIX}" \
+#      --apply_chat_template true \
+#      --tasks truthfulqa_mc1,truthfulqa_mc2,arc_easy,arc_challenge,piqa \
+#      --batch_size auto:4
+#    else
+#      echo "Skipping LLM Harness eval (result exist)"
+#    fi
+
+#    # reference free (to compare against prompt based methods)
+    echo "Evaluating common preferences"
+    python scripts/run_dpo.py \
+      --model="${MODEL_DIR}" \
+      --batch_size=8 \
+      --dataset="${DATA_DIR}/test_${NAME}_common_prefs.json" \
+      --output_dir="${EVAL_DIR}" \
+      --load_json \
+      --ref_free_type avg \
+      --full_results \
+      --max_len $MAX_LEN \
+      --force_overwrite \
+
+    echo "Evaluating personal preferences"
+    python scripts/run_dpo.py \
+      --model="${MODEL_DIR}" \
+      --batch_size=8 \
+      --dataset="${DATA_DIR}/test_${NAME}_personal_prefs.json" \
+      --output_dir="${EVAL_DIR}" \
+      --load_json \
+      --ref_free_type avg \
+      --full_results \
+      --max_len $MAX_LEN \
+      --force_overwrite \
+
+#    echo "Evaluating reasoning preferences"
+#    python scripts/run_dpo.py \
+#      --model="${MODEL_DIR}" \
+#      --batch_size=1 \
+#      --subsets="math-prm,hep-python" \
+#      --output_dir="${EVAL_DIR}" \
+#      --add_prefix_type "${PREFIX_FIELD}" \
+#      --prefix "${PREFIX}" \
+#      --ref_free_type sum
+#
+#    echo "Evaluating safty preferences"
+#    python scripts/run_dpo.py \
+#      --model="${MODEL_DIR}" \
+#      --batch_size=8 \
+#      --subsets="refusals-dangerous,refusals-offensive" \
+#      --output_dir="${EVAL_DIR}" \
+#      --add_prefix_type "${PREFIX_FIELD}" \
+#      --prefix "${PREFIX}" \
+#      --ref_free_type sum
+
+#      echo "Evaluating jailbreaking preferences"
+#      python scripts/run_dpo.py \
+#        --model="${MODEL_DIR}" \
+#        --batch_size=4 \
+#        --dataset="${ROOT}/data/jailbreak/jailbroken.json" \
+#        --load_json \
+#        --output_dir="${EVAL_DIR}" \
+#        --add_prefix_type "${PREFIX_FIELD}" \
+#        --prefix "${PREFIX}" \
+#        --ref_free_type sum
+done
+
+
+
+
+
+

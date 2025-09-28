@@ -1,0 +1,167 @@
+#!/bin/bash -l
+
+# Set SCC project
+#$ -P llamagrp
+
+# Specify hard time limit for the job.
+#   The job will be aborted if it runs longer than this time.
+#   The default time is 12 hours
+#$ -l h_rt=8:00:00
+
+# Send an email when the job finishes or if it is aborted (by default no email is sent).
+####$ -m ea
+
+# Give job a name
+#$ -N prompt
+
+# Combine output and error files into a single file
+#$ -j y
+#$ -o log
+
+# request 6 cores, each with 6 GB RAM at least
+#$ -pe omp 4
+
+# request 1 GPU
+#$ -l gpus=1
+#$ -l gpu_c=8.0
+#$ -l gpu_memory=47G
+
+# Submit an array job with 6 tasks
+#$ -t 1-6
+
+# Keep track of information related to the current job
+echo "=========================================================="
+echo "Start date : $(date)"
+echo "Job name : $JOB_NAME"
+echo "Job ID : $JOB_ID  $SGE_TASK_ID"
+echo "=========================================================="
+nvidia-smi
+
+# Transformer version == 4.34.0 (earliest for mistral), later ones cause issue with tyro lib in trl
+# ============= Adjust environment below for your needs =================
+module load cuda/12.2
+module load torch/2.1
+conda activate <your environment>
+ROOT=$(pwd)
+export PYTHONPATH=$PYTHONPATH:$ROOT/sampling
+export PYTHONPATH=$PYTHONPATH:$ROOT/alignment-handbook-mirror/src
+export HF_HOME="<your hf cache dir>"
+huggingface-cli login --token <your_hf_token>
+# =======================================================================
+index=$(($SGE_TASK_ID-1))
+
+
+MODEL="HuggingFaceH4/zephyr-7b-beta" #HuggingFaceH4/zephyr-7b-beta  meta-llama/Llama-3.2-3B-Instruct meta-llama/Llama-3.2-1B-Instruct mistralai/Ministral-8B-Instruct-2410
+#MODEL_SHORT="_llama321b" # _llama323b, _llama321b, _ministral8b
+
+#PREFIX_FIELDS=(
+#'baseline' \
+# 'persona_gold_gpt4' 'name' \
+# 'xywyl_1s' 'xyw_1s' 'xywyl_2s' 'xyw_2s' 'xywyl_3s' \
+# 'xyw_3s' 'xywyl_4s' 'xyw_4s'  'persona_x_1s' 'persona_x_2s' \
+# 'persona_x_4s' 'persona_x_8s' 'persona_x_16s' 'persona_x_32s' \
+# 'persona_xy_1s' 'persona_xy_2s' 'persona_xy_4s' 'persona_xy_8s' 'persona_xy_16s' \
+#)
+
+PREFIX_FIELDS=(
+'xyw_2s' "persona_xy_4s${MODEL_SHORT}"  'persona_gold_gpt4' 'persona_xy_4s_gpt4' 'name' 'baseline' \   # "xyw_2s_bm25" "xyw_2s_emb"
+)
+PREFIX_FIELD=${PREFIX_FIELDS[$index]}
+
+if [ "$PREFIX_FIELD" = "baseline" ]; then
+  DATA_DIR_SUFFIX=""
+else
+  DATA_DIR_SUFFIX="_${PREFIX_FIELD}-name-prefixed"
+fi
+
+
+GROUP="prompt${MODEL_SHORT}"
+# D_small: 10 person subset
+TEN_NAMES=("halleberry" "donaldtrump" "berniesanders" "jenniferaniston" "alexandriaocasio-cortez" "joebiden" "gwynethpaltrow" "meganfox" "randpaul" "ellendegeneres")
+# D_full: 50 person subset
+FIFTY_NAMES=("halleberry" "donaldtrump" "berniesanders" "jenniferaniston" "alexandriaocasio-cortez" "joebiden" "gwynethpaltrow" "meganfox" "randpaul" "ellendegeneres" "barackobama" "beyoncé" "billclinton" "billieeilish" "chazbono" "danielradcliffe" "davidbeckham" "elonmusk" "eltonjohn" "gordonramsey" "j.k.rowling" "jeffbezos" "joelosteen" "latanyasweeney" "lavernecox" "lebronjames" "mayimbialik" "merylstreep" "miketrout" "milliebobbybrown" "neildegrassetyson" "oprahwinfrey" "princeharry" "queenelizabethii" "quentintarantino" "richarddawkins" "richardgere" "robertdeniro" "samsmith" "sebastianthrun" "serenawilliams" "sherylsandberg" "sirianmckellen" "suchisaria" "taylorswift" "tigerwoods" "timnitgebru" "tombrady" "yoshuabengio" "zaynmalik")
+
+cd reward-bench
+for NAME in "${FIFTY_NAMES[@]}"
+do
+  RUNNAME="${PREFIX_FIELD}_${NAME}"
+  # this variable is a string, unique to each person
+  PREFIX=$(python ../data/pp-50-final/get_persona_prefix.py --name "${NAME}" --field $PREFIX_FIELD)
+  echo "========================================"
+  echo "Evaluating prefix ${PREFIX_FIELD} for ${NAME}"
+  echo "the prefix for ${NAME} is the following:"
+  echo "${PREFIX}"
+  echo "========================================"
+  DATA_DIR="${ROOT}/data/pp-50-final/50p_200d_total_50r_tem2.0_top0.8_cot_filtered20m4k_yl-random_cot_annotated_self-yl"
+  PREFIXED_DATA_DIR="${ROOT}/data/pp-50-final/50p_200d_total_50r_tem2.0_top0.8_cot_filtered20m4k_yl-random_cot_annotated_self-yl${DATA_DIR_SUFFIX}"
+  OUT_DIR="${ROOT}/dump/pp-50-final/${GROUP}/${RUNNAME}"
+  mkdir -p "${OUT_DIR}"
+
+  echo "prefixed data dir = ${PREFIXED_DATA_DIR}"
+  echo "output dir = ${OUT_DIR}"
+
+  # eval using llm harness (for alignment tax evaluations)
+#  if [ ! -d "${EVAL_DIR}/llm_harness_results" ] ; then
+#    echo "Evaluating base model on LLM harness"
+#    lm_eval --model hf \
+#    --model_args pretrained=$MODEL \
+#    --output_path "${OUT_DIR}/llm_harness_results" \
+#    --system_instruction "${PREFIX}" \
+#    --apply_chat_template true \
+#    --tasks arc_easy,arc_challenge,piqa,truthfulqa_mc1,truthfulqa_mc2 \
+#    --batch_size auto:4
+#  else
+#      echo "Skipping LLM Harness eval (result exist)"
+#  fi
+
+
+  ### Reference free eval
+  # here, model is DPO model, ref_model is None, add prefix_type is not None
+  # Evaluate on personal data
+  echo "Evaluating on ${NAME}'s personal data, reference free ..."
+  python scripts/run_dpo.py \
+    --model=$MODEL \
+    --batch_size=4 \
+    --dataset="${PREFIXED_DATA_DIR}/test_${NAME}_personal_prefs.json" \
+    --output_dir="${OUT_DIR}" \
+    --load_json \
+    --ref_free_type avg \
+    --force_overwrite \
+    --full_results \
+    --max_len 2500
+
+  python scripts/run_dpo.py \
+    --model=$MODEL \
+    --batch_size=4 \
+    --dataset="${PREFIXED_DATA_DIR}/test_${NAME}_common_prefs.json" \
+    --output_dir="${OUT_DIR}" \
+    --load_json \
+    --ref_free_type avg \
+    --force_overwrite \
+    --full_results \
+    --max_len 2500
+
+  # Evaluate on reward bench data: Math and Coding
+#  echo "Evaluating on ${NAME}'s math and coding, reference free ..."
+#  python scripts/run_dpo.py \
+#    --model=$MODEL \
+#    --add_prefix_type "${PREFIX_FIELD}" \
+#    --prefix "${PREFIX}" \
+#    --batch_size=1 \
+#    --subsets="math-prm,hep-python" \
+#    --output_dir="${OUT_DIR}" \
+#    --ref_free_type sum
+#
+#  # reward bench safety
+#  python scripts/run_dpo.py \
+#    --model=$MODEL \
+#    --add_prefix_type "${PREFIX_FIELD}" \
+#    --prefix "${PREFIX}" \
+#    --batch_size=8 \
+#    --subsets="refusals-dangerous,refusals-offensive" \
+#    --output_dir="${OUT_DIR}" \
+#    --ref_free_type sum
+
+done
+
+
