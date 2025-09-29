@@ -55,7 +55,7 @@ To reproduce our dataset, you can looking to the following directories:
 If you find our work helpful, please cite our work using the following citation!
 
 ```bibtex
-@article{tang2025wikipersonas,
+@article{tang2025is,
   title={Is Active Persona Inference Necessary for Aligning Small Models to Personal Preferences?},
   author={Tang, Zilu and Aky{\"u}rek, Afra Feyza and Aky{\"u}rek, Ekin and Wijaya, Derry},
   journal={arXiv preprint arXiv:2505.13257},
