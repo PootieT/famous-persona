@@ -53,8 +53,6 @@ huggingface-cli login --token <your_hf_token>
 # =======================================================================
 
 index=$(($SGE_TASK_ID-1))
-export -n HF_TOKEN
-huggingface-cli login --token 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
 
 # meta-llama/Llama-3.2-3B-Instruct meta-llama/Llama-3.2-1B-Instruct
 # mistralai/Ministral-8B-Instruct-2410 HuggingFaceH4/zephyr-7b-beta
