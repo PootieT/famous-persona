@@ -29,9 +29,16 @@ personal questions (i.e. something only that person would ask). Half of the ques
 person is expected to share a conflicting preference with at least another person in the dataset. See figure above for 
 our dataset generation procedure (and refer to the paper). You can access our dataset on [huggingface]()
 
-## Project Setup
-Clone our repository with `git clone`. Then pull raw dataset file with `git lfs pull`.
-Create an environment with Python 3.10 or above. Run `pip install -f requirements.txt`.
+## Project Setup (to reproduce our results)
+1. Clone our repository with `git clone`. Then pull raw dataset file with `git lfs pull`.
+2. Follow `alignment-handbook` installation [instruction](alignment-handbook-mirror/README.md)
+3. Follow `reward-bench` installation [instruction](reward-bench/README.md)
+4. Clone [alphaca-farm](https://github.com/tatsu-lab/alpaca_farm.git), put `sampling/annotator_config` inside 
+`alpaca_farm/auto_annotations/annotators` and refer to the target .yaml file. Please refer to alpacafarm code for details.
+5. Install the following libraries:
+```commandline
+pip install bm25 sentence-transformers toposort tiktoken alpaca_eval pyyaml
+```
 
 ## Our Codebase setup
 To reproduce our dataset, you can looking to the following directories:
@@ -41,6 +48,7 @@ To reproduce our dataset, you can looking to the following directories:
 - `reward-bench`: Everything related to evaluation. Modified from [reward-bench](https://github.com/allenai/reward-bench)
 - `experiments`: Everything related to scripts that run our training/evaluation experiments.
 - `dump`: Raw results from our experiments
+- `analysis` : Code related to processing the results, attributions, etc.
 
 ## Citation
 
@@ -48,7 +56,7 @@ If you find our work helpful, please cite our work using the following citation!
 
 ```bibtex
 @article{tang2025wikipersonas,
-  title={WikiPersonas: What Can We Learn From Personalized Alignment to Famous People?},
+  title={Is Active Persona Inference Necessary for Aligning Small Models to Personal Preferences?},
   author={Tang, Zilu and Aky{\"u}rek, Afra Feyza and Aky{\"u}rek, Ekin and Wijaya, Derry},
   journal={arXiv preprint arXiv:2505.13257},
   year={2025}

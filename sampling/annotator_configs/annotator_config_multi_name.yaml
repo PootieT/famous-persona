@@ -1,0 +1,18 @@
+batch_size: 5
+decoder_kwargs:
+  max_tokens: 250
+  model_name: gpt-4-0613
+  temperature: 1.0
+  tokens_to_favor:
+  - Output (a)
+  - Output (b)
+fn_decoder: openai_completions
+gpt4_3:
+  with_inputs: annotator_configs/multi_wiki_person_preference_with_input.txt
+outputs_to_match:
+  1: '(?:^|
+
+    )Output \(a\)'
+  2: '(?:^|
+
+    )Output \(b\)'

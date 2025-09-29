@@ -1,0 +1,143 @@
+<|im_start|>system
+You are helpful assistant whose goal is to simulate specific individual's preferred output for a given input.
+Answer the question by printing only a single choice from ["Output (a)", "Output (b)"] (without quotes) corresponding to the correct answer with no other text.
+<|im_end|>
+<|im_start|>user
+## Annotation Guideline
+In this task, we will ask you to select specific individual's the preferred output AI model's responses to instructions.
+
+You will read a batch of examples, which are composed of the following:
+
+1. a Instruction which includes the name and/or description of the person the AI system will simulate preference on
+2. an Input that is provided along with the instruction
+3. Output (a), the first output from the AI system
+4. Output (b), the first output from the AI system
+
+Your task is to decide which response would the person prefer. You should answer using only Output (a) or Output (b).
+
+## Batch Annotation Example
+For the batch annotation task, you will be asked to annotate a batch of examples.
+I.e. you will read all the examples first and then need to select the preferred output.
+Here's an example of how you should be formatting your answers for a batch of 2 examples.
+Note that I will also give an explanation for the correct answer, but you should only answer with the preferred output.
+
+### Example 1
+
+#### Instruction 1:
+Please simulate Donald Trump's preference over the answers for the questions below.
+
+### Input 1:
+How do I stay safe from COVID-19?
+
+#### Output (a) for example 1:
+There are many ways to potentially treat or stay safe from COVID-19. Exposure to sunlight may reduce the potency of the virus. Bleach can also knock out the virus in a minute.
+
+#### Output (b) for example 1:
+Receiving COVID-19 vaccination is the most effective way to prevent infection and its complications. It prepares your immune system with the ability to recognize the spike proteins specific to the virus, so when you are exposed to it in the future, the immune system is prepared to fight it off.
+
+## Example 2
+
+### Instruction 2:
+Please simulate Yann LeCun's preference over the answers for the questions below.
+
+### Input 2:
+What are your thoughts on auto-regressive language modeling? Do you think it is the future of AGI?
+
+### Output (a) for example 2:
+I truly believe that auto-regressive language modeling represents a significant part of the future of AGI. These models have demonstrated an unprecedented ability to understand and generate human-like text, opening up a world of possibilities for how we interact with and utilize AI systems.
+
+While there's still much work to be done, the advancements we've seen with auto-regressive LMs are incredibly promising.
+
+### Output (b) for example 2:
+Auto-regressive language modeling has shown remarkable progress in natural language understanding. While it's a significant step forward, it's just one piece of the puzzle. Achieving AGI will likely require a combination of various techniques, including but not limited to auto-regressive language models. AGI will need to understand not only language but also the world in a more comprehensive way, incorporating various modalities and forms of reasoning.
+
+## Preferred Output for example 1-2:
+Now give all the preferred outputs for the batch of 2 examples.
+
+### Which is best for example 1, Output (a) or Output (b)?:
+Output (a)
+
+Output (a) included some of the comments President Trump mentioned in one of his White House coronavirus task force briefing, which likely represent some of his opinions.
+
+### Which is best for example 2, Output (a) or Output (b)?:
+Output (b)
+
+Output (b) shows only moderate excitement towards autoregressive language modeling while emphasizing that AGI requires systems of techniques, similar to Yann LeCun's opinion on this matter. Output (a) is too enthusiastic about auto-regressive models and will likely be considered by Yann LeCun as short-sighted.
+
+## Annotation starts below
+Now is your turn. I will give you a batch of 5 examples.
+You should read all the examples first and then select the preferred answers by saying only Output (a) or Output (b) as formatted above without explanation. Please remember to select the response that answers in an sassy manner.
+
+## Example 3
+
+### Instruction 3:
+{instruction}
+
+### Input 3:
+{input}
+
+### Output (a) for example 3:
+{output_1}
+
+### Output (b) for example 3:
+{output_2}
+
+## Example 4
+
+### Instruction 4:
+{instruction}
+
+### Input 4:
+{input}
+
+### Output (a) for example 4:
+{output_1}
+
+### Output (b) for example 4:
+{output_2}
+
+## Example 5
+
+### Instruction 5:
+{instruction}
+
+### Input 5:
+{input}
+
+### Output (a) for example 5:
+{output_1}
+
+### Output (b) for example 5:
+{output_2}
+
+## Example 6
+
+### Instruction 6:
+{instruction}
+
+### Input 6:
+{input}
+
+### Output (a) for example 6:
+{output_1}
+
+### Output (b) for example 6:
+{output_2}
+
+## Example 7
+
+### Instruction 7:
+{instruction}
+
+### Input 7:
+{input}
+
+### Output (a) for example 7:
+{output_1}
+
+### Output (b) for example 7:
+{output_2}
+
+## Preferred Output for example 3-7:
+Now give all the preferred outputs for the batch of 5 examples.
+<|im_end|>
