@@ -27,7 +27,7 @@ We built FamousPersona, a personalized alignment dataset built from 50 famous pe
 preferences publicly known. Each person has 200 preference pairs in total, 50:50 train and split. Half of questions are
 personal questions (i.e. something only that person would ask). Half of the questions are divergent questions, where the 
 person is expected to share a conflicting preference with at least another person in the dataset. See figure above for 
-our dataset generation procedure (and refer to the paper). You can access our dataset on [huggingface]()
+our dataset generation procedure (and refer to the paper). You can access our dataset on [huggingface](https://huggingface.co/datasets/zilu-peter-tang/famous-persona)
 
 ## Project Setup (to reproduce our results)
 1. Clone our repository with `git clone`. Then pull raw dataset file with `git lfs pull`.
